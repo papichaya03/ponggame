@@ -4,7 +4,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
@@ -39,7 +41,9 @@ public class ponggame extends SurfaceView implements Runnable {
         mFontMargin = mScreenX / 75;
         mOurHolder = getHolder();
         mPaint = new Paint();
-
+        mBall = new Ball(mScreenX);
+        mBall = new Ball(mScreenX);
+        mBat = new Bat(mScreenX, mScreenY);
         startNewGame();
 
     }
@@ -47,6 +51,7 @@ public class ponggame extends SurfaceView implements Runnable {
     private void startNewGame() {
         mScore = 0;
         mLives = 3;
+        mBall.reset(mScreenX, mScreenY);
     }
     private void draw() {
             if (mOurHolder.getSurface().isValid()) {
@@ -54,8 +59,11 @@ public class ponggame extends SurfaceView implements Runnable {
                 mCanvas.drawColor(Color.argb(255, 26, 128, 182));
                 mPaint.setColor(Color.argb(255, 255, 255, 255));
                 mPaint.setTextSize(mFontSize);
+                mCanvas.drawRect(mBall.getRect(), mPaint);
+                mCanvas.drawRect(mBall.getRect(), mPaint);
+                mCanvas.drawRect(mBat.getRect(), mPaint);
+                //Draw
                 mCanvas.drawText("Score: " + mScore + " Lives: " + mLives,
-
                         mFontMargin, mFontSize, mPaint);
 
                 if (DEBUGGING) {
@@ -64,7 +72,6 @@ public class ponggame extends SurfaceView implements Runnable {
                 mOurHolder.unlockCanvasAndPost(mCanvas);
             }
         }
-
 
     private void printDebuggingText() {
         int debugSize = mFontSize / 2;
@@ -77,35 +84,54 @@ public class ponggame extends SurfaceView implements Runnable {
     @Override
     public void run() {
         while (mPlaying) {
-// What time is it now at the start of the loop?
             long frameStartTime = System.currentTimeMillis();
-// Provided the game isn't paused call the update method
             if(!mPaused){
                 update(); // update new positions
                 detectCollisions(); // detect collisions
             }
-//draw the scene
             draw();
-// How long did this frame/loop take?
             long timeThisFrame = System.currentTimeMillis() - frameStartTime;
-// check timeThisFrame > 0 ms because dividing by 0 will crashes game
             if (timeThisFrame > 0) {
-// Store frame rate to pass to the update methods of mBat and mBall
                 mFPS = MILLIS_IN_SECOND / timeThisFrame;
             }
         }
     }
 
     private void update() {
+        mBall.update(mFPS);
+        mBall.update(mFPS);
+        mBat.update(mFPS);
     }
 
     private void detectCollisions() {
+        if(RectF.intersects(mBat.getRect(),
+                mBall.getRect())) {
+// Realistic-ish bounce
+            mBall.batBounce(mBat.getRect());
+            mBall.increaseVelocity();
+            mScore++;
+        }
+        if(mBall.getRect().bottom > mScreenY){
+            mBall.reverseYVelocity();
+            mLives--;
+            if(mLives == 0){
+                mPaused = true;
+                startNewGame();
+            }
+        }
+        if(mBall.getRect().top < 0){
+            mBall.reverseYVelocity();
+        }
+        if(mBall.getRect().left < 0){
+            mBall.reverseXVelocity();
+        }
+        if(mBall.getRect().right > mScreenX){
+            mBall.reverseXVelocity();
+        }
     }
 
 
     public void pause() {
-
-// Set mPlaying to false. Stopping the thread isn’t always instant
         mPlaying = false;
         try {
 
@@ -120,11 +146,34 @@ public class ponggame extends SurfaceView implements Runnable {
     }
     public void resume() {
         mPlaying = true;
-// Initialize the instance of Thread
         mGameThread = new Thread(this);
-// Start the thread
         mGameThread.start();
 
     }
+    @Override
+    public boolean onTouchEvent(MotionEvent motionEvent) {
+        switch (motionEvent.getAction() &
+                MotionEvent.ACTION_MASK) {
+            case MotionEvent.ACTION_DOWN:
+                mPaused = false;
+
+                if
+                (motionEvent.getX() > mScreenX / 2){
+
+                    mBat.setMovementState(mBat.RIGHT);
+                }
+                else
+                {
+                    mBat.setMovementState(mBat.LEFT);
+                }
+                break;
+
+            case MotionEvent.ACTION_UP:
+                mBat.setMovementState(mBat.STOPPED);
+                break;
+        }
+        return true;
+    }
+
 }
 
